@@ -14,6 +14,8 @@ class Node:
         next_port: The port number of the next node in the ring (None if single node).
         address_book: Sorted list of known addresses in the ring (alphabetical order).
         message_log: List of recent message payloads for deduplication.
+        last_ping_received: Timestamp of last PING received (for head/tail detection).
+        last_echo_received: Timestamp of last ECHO received (for head/tail detection).
     """
 
     address: str
@@ -22,6 +24,8 @@ class Node:
     next_port: int | None = None
     address_book: list[str] = field(default_factory=list)
     message_log: list[str] = field(default_factory=list)
+    last_ping_received: float | None = None
+    last_echo_received: float | None = None
 
     def set_next(self, address: str, port: int) -> None:
         """Set the next node in the ring.
@@ -113,3 +117,39 @@ class Node:
         if self.next_address is None or self.next_port is None:
             return None
         return f"{self.next_address}:{self.next_port}"
+
+    def record_ping(self) -> None:
+        """Record that a PING was received (update timestamp)."""
+        import time
+
+        self.last_ping_received = time.time()
+
+    def record_echo(self) -> None:
+        """Record that an ECHO was received (update timestamp)."""
+        import time
+
+        self.last_echo_received = time.time()
+
+    def is_head(self) -> bool:
+        """Check if node is the head (sending PINGs but not receiving ECHOs).
+
+        A node is head when it has a next node but hasn't received ECHO
+        from its next for too long.
+
+        Returns:
+            True if node is head, False otherwise.
+        """
+        if self.next_address is None or self.next_port is None:
+            return False
+        return self.last_echo_received is None
+
+    def is_tail(self) -> bool:
+        """Check if node is the tail (not receiving PINGs).
+
+        A node is tail when it hasn't received PING from its predecessor
+        for too long.
+
+        Returns:
+            True if node is tail, False otherwise.
+        """
+        return self.last_ping_received is None

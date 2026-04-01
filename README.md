@@ -78,6 +78,47 @@ ai-ring-chat/
 
 ## Network Protocol
 
+The protocol is implemented in `control/protocol.py` with static methods that handle each message type. The `Node` class in `model/nodes.py` leads the interaction - it listens for messages and delegates handling to protocol methods.
+
+### Protocol Methods
+
+Each message type has a corresponding handler method:
+
+| Method | Description |
+|--------|-------------|
+| `handle_join(node, message)` | Set node's next to sender, propagate JOIN |
+| `handle_exit(node, message)` | Remove exiting node from ring, propagate |
+| `handle_ping(node, message)` | Record PING timestamp, respond with ECHO |
+| `handle_echo(node, message)` | Record ECHO timestamp, update node state |
+| `handle_next(node, message)` | If `is_head()`, set next to sender; else propagate |
+| `handle_text(node, message)` | Log payload, propagate if not duplicate |
+| `handle_user(node, message)` | Deliver to target or propagate |
+
+### Head/Tail Detection
+
+Each node tracks timestamps:
+- `last_ping_received` - timestamp of last PING received
+- `last_echo_received` - timestamp of last ECHO received
+
+Node determines its state:
+- **Head**: Sending PINGs but not receiving ECHOs (next node failed)
+- **Tail**: Not receiving PINGs (predecessor failed)
+- **Normal**: Receiving both PINGs and ECHOs
+
+### Message Propagation
+
+- TEXT messages propagate to all nodes (stop if payload already in log)
+- USER messages propagate until target is reached
+- Control messages (JOIN, EXIT, PING, ECHO, NEXT) propagate as needed
+
+### Network Layer
+
+Low-level UDP sending is handled by `control/network.py`:
+- `send(address, port, message)` - send message to endpoint
+- `receive(socket)` - receive incoming messages
+
+---
+
 ### Node Identity
 
 Each node is identified by:
@@ -248,10 +289,8 @@ python main.py --address 127.0.0.1 --port 5002 --join 127.0.0.1:5000
 ### Future Enhancements
 
 - [ ] **Cryptographic addressing**: Replace address-based targeting with public key fingerprints
-- [ ] **Double ring**: Bidirectional message passing for faster propagation and easier recovery
 - [ ] **Persistence**: Store message log to disk
 - [ ] **GUI**: Web-based or desktop interface
-- [ ] **Unit tests**: Comprehensive testing of protocol handlers
 - [ ] **Integration tests**: Multi-node simulation
 
 ---
@@ -270,26 +309,34 @@ This project is being developed with AI assistance to evaluate:
 
 | Metric | Value |
 |--------|-------|
-| **Tests** | 97 passed |
-| **Coverage** | 99% overall (main.py: 99%, message.py: 99%, nodes.py: 100%) |
-| **Complexity** | Average A (2.11) |
+| **Tests** | 118 passed |
+| **Coverage** | 99% overall (main.py: 99%, message.py: 99%, nodes.py: 96%, protocol.py: 100%) |
+| **Complexity** | Average A (2.21) |
 
 ### Code Complexity by Function
 
 | Function | Grade | Score |
 |----------|-------|-------|
+| `parse_message` | A | 5 |
+| `handle_user` | A | 5 |
 | `parse_port` | A | 4 |
 | `Node.add_to_address_book` | A | 4 |
+| `_process_exit` | A | 4 |
 | `Address` | A | 4 |
 | `Address.parse` | A | 4 |
+| `handle_next` | A | 4 |
+| `handle_text` | A | 4 |
 | `get_ipv4_address` | A | 3 |
 | `parse_join_target` | A | 3 |
 | `parse_args` | A | 3 |
 | `main` | A | 3 |
-| `Node` | A | 3 |
-| `Message` | A | 3 |
+| `Node` | A | 2 |
+| `Node.is_head` | A | 3 |
 | `Node.next_address_str` | A | 3 |
-| `parse_message` | A | 5 |
+| `Message` | A | 3 |
+| `handle_join` | A | 3 |
+| `handle_exit` | A | 3 |
+| `_extract_target` | A | 3 |
 | `is_valid_ipv4` | A | 2 |
 | `NodeConfig` | A | 1 |
 | `MessageType` | A | 1 |
