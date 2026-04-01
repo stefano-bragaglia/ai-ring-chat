@@ -7,182 +7,187 @@ import pytest
 from ai_ring_chat.main import (
     PRIVILEGED_PORT_THRESHOLD,
     DEFAULT_PROTOCOL_PORT,
+    parse_port,
+    is_valid_ipv4,
     parse_join_target,
-    validate_port,
     parse_args,
     NodeConfig,
 )
 
 
-class TestValidatePort:
-    """Tests for validate_port function."""
+class TestIsValidIPv4:
+    """Tests for is_valid_ipv4 function."""
+
+    def test_valid_addresses(self):
+        """Valid IPv4 addresses should return True."""
+        assert is_valid_ipv4("192.168.1.1") is True
+        assert is_valid_ipv4("127.0.0.1") is True
+        assert is_valid_ipv4("0.0.0.0") is True
+        assert is_valid_ipv4("255.255.255.255") is True
+        assert is_valid_ipv4("10.0.0.1") is True
+        assert is_valid_ipv4("172.16.0.1") is True
+
+    def test_invalid_addresses(self):
+        """Invalid addresses should return False."""
+        assert is_valid_ipv4("192.168.1") is False
+        assert is_valid_ipv4("192.168.1.1.1") is False
+        assert is_valid_ipv4("256.0.0.1") is False
+        assert is_valid_ipv4("192.168.1.300") is False
+        assert is_valid_ipv4("192.168.1.-1") is False
+        assert is_valid_ipv4("abc.def.ghi.jkl") is False
+        assert is_valid_ipv4("192.168.1.1:57782") is False
+        assert is_valid_ipv4("") is False
+        assert is_valid_ipv4("localhost") is False
+
+
+class TestParsePort:
+    """Tests for parse_port function."""
 
     def test_valid_port(self):
-        """Valid ports should not raise."""
-        validate_port(57782)
-        validate_port(1024)
-        validate_port(65535)
-        validate_port(0)
+        """Valid ports should return the port number."""
+        assert parse_port("57782", "--join", is_test_mode=False) == 57782
+        assert parse_port("0", "--join", is_test_mode=False) == 0
+        assert parse_port("65535", "--join", is_test_mode=False) == 65535
 
-    def test_invalid_port_negative(self):
-        """Negative ports should raise."""
+    def test_test_mode_valid_port(self):
+        """Test mode ports > 1024 should work."""
+        assert parse_port("1025", "--self", is_test_mode=True) == 1025
+        assert parse_port("9000", "--join", is_test_mode=True) == 9000
+
+    def test_non_numeric(self):
+        """Non-numeric port should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            validate_port(-1)
-        assert "-1" in str(exc_info.value)
+            parse_port("abc", "--join", is_test_mode=False)
+        assert "not a number" in str(exc_info.value)
 
-    def test_invalid_port_too_high(self):
-        """Ports > 65535 should raise."""
+    def test_port_too_low(self):
+        """Port < 0 should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            validate_port(65536)
-        assert "65535" in str(exc_info.value)
+            parse_port("-1", "--join", is_test_mode=False)
+        assert "between 0 and 65535" in str(exc_info.value)
 
-    def test_test_mode_port_below_threshold(self):
-        """Test mode ports <= 1024 should raise."""
+    def test_port_too_high(self):
+        """Port > 65535 should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            validate_port(1024, is_test_mode=True)
-        assert "1024" in str(exc_info.value)
+            parse_port("65536", "--join", is_test_mode=False)
+        assert "between 0 and 65535" in str(exc_info.value)
 
-    def test_test_mode_port_above_threshold(self):
-        """Test mode ports > 1024 should not raise."""
-        validate_port(1025, is_test_mode=True)
-        validate_port(9000, is_test_mode=True)
+    def test_test_mode_port_too_low(self):
+        """Test mode port <= 1024 should raise."""
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            parse_port("1024", "--self", is_test_mode=True)
+        assert "greater than 1024" in str(exc_info.value)
 
 
 class TestParseJoinTarget:
     """Tests for parse_join_target function."""
 
-    def test_full_address_port_normal_mode(self):
-        """Full address:port format in normal mode."""
-        addr, port = parse_join_target("192.168.1.100:57782", test_mode=False)
+    def test_normal_mode_ipv4_address(self):
+        """Normal mode: IPv4 address with default port."""
+        addr, port = parse_join_target("192.168.1.100", is_test_mode=False)
         assert addr == "192.168.1.100"
-        assert port == 57782
+        assert port == DEFAULT_PROTOCOL_PORT
 
-    def test_full_address_port_test_mode(self):
-        """Full address:port format in test mode."""
-        addr, port = parse_join_target("127.0.0.1:9000", test_mode=True)
-        assert addr == "127.0.0.1"
-        assert port == 9000
-
-    def test_address_only_normal_mode(self):
-        """Address only in normal mode (uses default port)."""
-        addr, port = parse_join_target("192.168.1.100", test_mode=False)
-        assert addr == "192.168.1.100"
-        assert port == 57782
-
-    def test_port_only_test_mode(self):
-        """Port only in test mode (uses localhost)."""
-        addr, port = parse_join_target("9000", test_mode=True)
-        assert addr == "127.0.0.1"
-        assert port == 9000
-
-    def test_invalid_format(self):
-        """Invalid format (multiple colons) should raise."""
+    def test_normal_mode_invalid_address(self):
+        """Normal mode: invalid address should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_join_target("invalid:format:too:many", test_mode=False)
-        assert "Invalid" in str(exc_info.value)
+            parse_join_target("192.168.1.1:57782", is_test_mode=False)
+        assert "Invalid IPv4 address" in str(exc_info.value)
 
-    def test_invalid_port_non_numeric(self):
-        """Non-numeric port should raise."""
+    def test_normal_mode_with_port_rejected(self):
+        """Normal mode: address:port format should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_join_target("192.168.1.100:abc", test_mode=False)
+            parse_join_target("192.168.1.100:57782", is_test_mode=False)
+        assert "Invalid IPv4 address" in str(exc_info.value)
+
+    def test_normal_mode_hostname_rejected(self):
+        """Normal mode: hostname should raise."""
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            parse_join_target("localhost", is_test_mode=False)
+        assert "Invalid IPv4 address" in str(exc_info.value)
+
+    def test_test_mode_port(self):
+        """Test mode: port number with localhost."""
+        addr, port = parse_join_target("9001", is_test_mode=True)
+        assert addr == "127.0.0.1"
+        assert port == 9001
+
+    def test_test_mode_ipv4_rejected(self):
+        """Test mode: IPv4 address should raise (expect port only)."""
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            parse_join_target("192.168.1.100", is_test_mode=True)
         assert "not a number" in str(exc_info.value)
-
-    def test_ipv6_address_with_port(self):
-        """IPv6 addresses should work."""
-        addr, port = parse_join_target("[::1]:9000", test_mode=False)
-        assert addr == "[::1]"
-        assert port == 9000
-
-    def test_hostname_with_port(self):
-        """Hostnames with port should work."""
-        addr, port = parse_join_target("localhost:57782", test_mode=False)
-        assert addr == "localhost"
-        assert port == 57782
 
 
 class TestParseArgs:
     """Tests for parse_args function."""
 
-    def test_local_mode_only(self):
-        """Test mode with just --local."""
-        config = parse_args(["--local", "9000"])
+    def test_no_arguments_normal_mode(self):
+        """No arguments creates normal mode node."""
+        config = parse_args([])
+        assert config.is_test_mode is False
+        assert config.port == DEFAULT_PROTOCOL_PORT
+        assert config.join_address is None
+        assert config.join_port is None
+
+    def test_self_mode_only(self):
+        """Test mode with just --self."""
+        config = parse_args(["--self", "9000"])
         assert config.is_test_mode is True
         assert config.address == "127.0.0.1"
         assert config.port == 9000
         assert config.join_address is None
         assert config.join_port is None
 
-    def test_local_mode_short_flag(self):
-        """Test mode with -l short flag."""
-        config = parse_args(["-l", "9000"])
+    def test_self_mode_short_flag(self):
+        """Test mode with -s short flag."""
+        config = parse_args(["-s", "9000"])
         assert config.is_test_mode is True
         assert config.port == 9000
 
-    def test_normal_mode_join_full_address(self):
-        """Normal mode with full address:port join target."""
-        config = parse_args(["--join", "192.168.1.100:57782"])
+    def test_normal_mode_join_ipv4(self):
+        """Normal mode with IPv4 address join target."""
+        config = parse_args(["--join", "192.168.1.100"])
         assert config.is_test_mode is False
         assert config.port == DEFAULT_PROTOCOL_PORT
         assert config.join_address == "192.168.1.100"
-        assert config.join_port == 57782
-
-    def test_normal_mode_join_address_only(self):
-        """Normal mode with address-only join target (uses default port)."""
-        config = parse_args(["--join", "192.168.1.100"])
-        assert config.is_test_mode is False
-        assert config.join_address == "192.168.1.100"
         assert config.join_port == DEFAULT_PROTOCOL_PORT
 
-    def test_test_mode_join_full_address(self):
-        """Test mode with full address:port join target."""
-        config = parse_args(["--local", "9000", "--join", "127.0.0.1:57782"])
-        assert config.is_test_mode is True
-        assert config.port == 9000
-        assert config.join_address == "127.0.0.1"
-        assert config.join_port == 57782
+    def test_normal_mode_join_ipv4_short_flag(self):
+        """Normal mode with -j short flag."""
+        config = parse_args(["-j", "10.0.0.1"])
+        assert config.join_address == "10.0.0.1"
 
-    def test_test_mode_join_port_only(self):
-        """Test mode with port-only join target (uses localhost)."""
-        config = parse_args(["--local", "9000", "--join", "57782"])
-        assert config.is_test_mode is True
-        assert config.port == 9000
-        assert config.join_address == "127.0.0.1"
-        assert config.join_port == 57782
-
-    def test_local_port_too_low(self):
-        """Local port <= 1024 should raise."""
-        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_args(["--local", "1024"])
-        assert "1024" in str(exc_info.value)
-
-    def test_local_port_1025(self):
-        """Local port 1025 should work."""
-        config = parse_args(["--local", "1025"])
-        assert config.port == 1025
-
-    def test_join_invalid_format(self):
-        """Invalid join format should raise."""
-        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_args(["--join", "invalid:format:too:many"])
-        assert "Invalid port" in str(exc_info.value)
-
-    def test_mutually_exclusive(self):
-        """--local and --join are mutually exclusive? Actually they aren't in our design."""
-
-    def test_both_flags(self):
-        """Both flags together should work (test mode with join target)."""
-        config = parse_args(["--local", "9000", "--join", "9001"])
+    def test_test_mode_join_port(self):
+        """Test mode with port-only join target."""
+        config = parse_args(["--self", "9000", "--join", "9001"])
         assert config.is_test_mode is True
         assert config.port == 9000
         assert config.join_address == "127.0.0.1"
         assert config.join_port == 9001
 
-    def test_no_arguments(self):
-        """No arguments creates a new ring node (normal mode, no join)."""
-        config = parse_args([])
-        assert config.is_test_mode is False
-        assert config.join_address is None
-        assert config.join_port is None
+    def test_self_port_too_low(self):
+        """--self port <= 1024 should raise."""
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            parse_args(["--self", "1024"])
+        assert "greater than 1024" in str(exc_info.value)
+
+    def test_self_port_1025(self):
+        """--self port 1025 should work."""
+        config = parse_args(["--self", "1025"])
+        assert config.port == 1025
+
+    def test_join_invalid_ipv4_normal_mode(self):
+        """Invalid IPv4 in normal mode should raise."""
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            parse_args(["--join", "invalid"])
+        assert "Invalid IPv4 address" in str(exc_info.value)
+
+    def test_join_port_as_address_rejected(self):
+        """Port-only in normal mode should raise."""
+        with pytest.raises(argparse.ArgumentTypeError) as exc_info:
+            parse_args(["--join", "9000"])
+        assert "Invalid IPv4 address" in str(exc_info.value)
 
 
 class TestNodeConfig:
@@ -207,7 +212,7 @@ class TestNodeConfig:
         """Join fields can be None for first node."""
         config = NodeConfig(
             address="192.168.1.100",
-            port=57782,
+            port=DEFAULT_PROTOCOL_PORT,
             is_test_mode=False,
             join_address=None,
             join_port=None,

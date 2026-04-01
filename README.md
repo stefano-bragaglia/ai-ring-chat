@@ -172,35 +172,32 @@ With two rings (clockwise and counter-clockwise):
 ### Command Line Arguments
 
 ```bash
-# Start a new ring (first node) in test mode
-python -m ai_ring_chat --local 9000
+# Start a new ring (first node) in normal mode
+python -m ai_ring_chat
 
-# Join an existing ring (normal mode)
-python -m ai_ring_chat --join 192.168.1.100:57782
-
-# Join an existing ring using default port (57782)
+# Join an existing ring (normal mode) - port 57782 is appended automatically
 python -m ai_ring_chat --join 192.168.1.100
 
-# Join a local test ring (test mode with two nodes)
-# Terminal 1: Start first test node
-python -m ai_ring_chat --local 9000
-# Terminal 2: Join first test node
-python -m ai_ring_chat --local 9001 --join 9000
+# Test mode with local port
+python -m ai_ring_chat --self 9000
+
+# Test mode: join another test node (both are ports)
+python -m ai_ring_chat --self 9000 --join 9001
 ```
 
 ### Arguments
 
 | Argument | Short | Description |
 |----------|-------|-------------|
-| `--local PORT` | `-l` | Test mode: run locally on specified port (> 1024). Address defaults to 127.0.0.1 |
-| `--join TARGET` | `-j` | Address:port of node to join. In test mode, TARGET can be just a port (uses localhost) |
+| `--self PORT` | `-s` | Test mode: run locally on specified port (> 1024). Address is 127.0.0.1 |
+| `--join TARGET` | `-j` | Target to join. In normal mode: IPv4 address (port 57782 appended). In test mode: port (address is 127.0.0.1) |
 
 ### Notes
 
+- **Normal mode**: Local address auto-detected, `--join` expects IPv4 address (e.g., `192.168.1.100`)
+- **Test mode**: Both `--self` and `--join` are ports, address is always `127.0.0.1`
 - **Default port**: 57782 (well-known port for the protocol)
-- **Local address**: Auto-detected via outbound connection (in normal mode)
 - **Test mode ports**: Must be > 1024 (privileged port threshold)
-- Running without arguments starts a new ring in normal mode
 
 Once running, type commands in the console:
 

@@ -1,6 +1,7 @@
 """Entry point for AI-Ring-Chat."""
 
 import argparse
+import re
 import socket
 import sys
 from dataclasses import dataclass
@@ -12,8 +13,8 @@ PRIVILEGED_PORT_THRESHOLD = 1024
 # Well-known port for the protocol
 DEFAULT_PROTOCOL_PORT = 57782
 
-# Default port for test mode (above privileged threshold)
-DEFAULT_TEST_PORT = 9000
+# Regex for valid IPv4 address (each octet 0-255)
+IPV4_PATTERN = re.compile(r"^(25[0-5]|2[0-4]\d|1?\d\d?)(\.(25[0-5]|2[0-4]\d|1?\d\d?)){3}$")
 
 
 @dataclass
@@ -45,13 +46,63 @@ def get_ipv4_address() -> str:
     return ip
 
 
-def parse_join_target(target: str, test_mode: bool) -> tuple[str, int]:
-    """Parse the --join argument.
+def is_valid_ipv4(address: str) -> bool:
+    """Check if a string is a valid IPv4 address.
     
     Args:
-        target: Either 'address:port' or just 'address' (in normal mode),
-                or 'address:port' or just 'port' (in test mode)
-        test_mode: Whether running in test mode
+        address: String to check
+        
+    Returns:
+        True if valid IPv4, False otherwise
+    """
+    if not IPV4_PATTERN.match(address):
+        return False
+    # Each octet is already validated by regex (0-255)
+    return True
+
+
+def parse_port(value: str, name: str, is_test_mode: bool) -> int:
+    """Parse and validate a port number.
+    
+    Args:
+        value: String representation of port
+        name: Name for error messages (e.g., '--self', '--join')
+        is_test_mode: Whether in test mode
+        
+    Returns:
+        Valid port number
+        
+    Raises:
+        argparse.ArgumentTypeError: If port is invalid
+    """
+    try:
+        port = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid port: '{value}' is not a number")
+    
+    if port < 0 or port > 65535:
+        raise argparse.ArgumentTypeError(
+            f"{name}: port must be between 0 and 65535, got {port}"
+        )
+    
+    if is_test_mode and port <= PRIVILEGED_PORT_THRESHOLD:
+        raise argparse.ArgumentTypeError(
+            f"{name}: port must be greater than {PRIVILEGED_PORT_THRESHOLD} "
+            f"(ports below require root privileges)"
+        )
+    
+    return port
+
+
+def parse_join_target(target: str, is_test_mode: bool) -> tuple[str, int]:
+    """Parse the --join argument.
+    
+    In test mode: TARGET is just a port number
+    In normal mode: TARGET is an IPv4 address (port 57782 is appended)
+    
+    Args:
+        target: The join target string
+        is_test_mode: Whether running in test mode
         
     Returns:
         Tuple of (address, port)
@@ -59,58 +110,20 @@ def parse_join_target(target: str, test_mode: bool) -> tuple[str, int]:
     Raises:
         argparse.ArgumentTypeError: If the format is invalid
     """
-    if ":" in target:
-        # Full address:port format
-        parts = target.rsplit(":", 1)
-        if len(parts) != 2:
-            raise argparse.ArgumentTypeError(
-                f"Invalid address:port format: '{target}'"
-            )
-        address, port_str = parts
-        try:
-            port = int(port_str)
-        except ValueError:
-            raise argparse.ArgumentTypeError(
-                f"Invalid port in '{target}': '{port_str}' is not a number"
-            )
+    if is_test_mode:
+        # Test mode: target is just a port, address is localhost
+        port = parse_port(target, "--join", is_test_mode=True)
+        address = "127.0.0.1"
     else:
-        # No colon: could be address (normal) or port (test mode)
-        if test_mode:
-            # Test mode: treat as port, use localhost
-            try:
-                port = int(target)
-            except ValueError:
-                raise argparse.ArgumentTypeError(
-                    f"Invalid port: '{target}' is not a number"
-                )
-            address = "127.0.0.1"
-        else:
-            # Normal mode: treat as address, use default port
-            address = target
-            port = DEFAULT_PROTOCOL_PORT
-
-    return address, port
-
-
-def validate_port(port: int, is_test_mode: bool = False) -> None:
-    """Validate port number.
+        # Normal mode: target is an IPv4 address, port is default
+        if not is_valid_ipv4(target):
+            raise argparse.ArgumentTypeError(
+                f"Invalid IPv4 address: '{target}' (expected format: d.d.d.d where d is 0-255)"
+            )
+        address = target
+        port = DEFAULT_PROTOCOL_PORT
     
-    Args:
-        port: The port number to validate
-        is_test_mode: Whether this is for test mode (enforces > 1024)
-        
-    Raises:
-        argparse.ArgumentTypeError: If port is invalid
-    """
-    if port < 0 or port > 65535:
-        raise argparse.ArgumentTypeError(
-            f"Port must be between 0 and 65535, got: {port}"
-        )
-    if is_test_mode and port <= PRIVILEGED_PORT_THRESHOLD:
-        raise argparse.ArgumentTypeError(
-            f"Test mode port must be greater than {PRIVILEGED_PORT_THRESHOLD} "
-            f"(ports below require root privileges)"
-        )
+    return address, port
 
 
 def parse_args(args: list[str] | None = None) -> NodeConfig:
@@ -130,23 +143,22 @@ def parse_args(args: list[str] | None = None) -> NodeConfig:
         epilog="""
 Examples:
   # Start a new ring (first node)
-  %(prog)s --local 9000
+  %(prog)s
   
   # Join an existing ring (normal mode)
-  %(prog)s --join 192.168.1.100:57782
-  
-  # Join an existing ring (test mode)
-  %(prog)s --local 9000 --join 127.0.0.1:57782
-  %(prog)s --local 9000 --join 9001
-  
-  # Join using default port (57782)
   %(prog)s --join 192.168.1.100
+  
+  # Test mode with local port
+  %(prog)s --self 9000
+  
+  # Test mode: join another test node
+  %(prog)s --self 9000 --join 9001
         """,
     )
 
     parser.add_argument(
-        "-l",
-        "--local",
+        "-s",
+        "--self",
         type=int,
         metavar="PORT",
         help=f"Local test mode port (must be > {PRIVILEGED_PORT_THRESHOLD}; "
@@ -157,42 +169,32 @@ Examples:
         "-j",
         "--join",
         metavar="TARGET",
-        help="Address:port of node to join. "
-             "In normal mode: 'address:port' or 'address' (uses default port 57782). "
-             "In test mode: 'address:port' or just 'port' (uses localhost).",
+        help="Address to join. "
+             "In normal mode: IPv4 address (port 57782 is appended). "
+             "In test mode: port number (uses localhost)",
     )
 
     parsed = parser.parse_args(args)
 
-    # Validate test mode port
-    if parsed.local is not None:
-        validate_port(parsed.local, is_test_mode=True)
+    # Parse test mode port
+    is_test_mode = parsed.self is not None
+    local_port: int
+    local_address: str
+
+    if is_test_mode:
+        # Validate local port
+        local_port = parse_port(str(parsed.self), "--self", is_test_mode=True)
+        local_address = "127.0.0.1"
     else:
-        # In normal mode, we'll use the auto-detected IP
-        pass
+        local_address = get_ipv4_address()
+        local_port = DEFAULT_PROTOCOL_PORT
 
     # Parse join target
-    is_test_mode = parsed.local is not None
     join_address: str | None = None
     join_port: int | None = None
 
     if parsed.join is not None:
         join_address, join_port = parse_join_target(parsed.join, is_test_mode)
-
-        # If port was specified as address in normal mode, use default port
-        if join_port is None:
-            join_port = DEFAULT_PROTOCOL_PORT
-
-        # Validate join port
-        validate_port(join_port)
-
-    # Determine local configuration
-    if is_test_mode:
-        local_address = "127.0.0.1"
-        local_port = parsed.local  # type: ignore
-    else:
-        local_address = get_ipv4_address()
-        local_port = DEFAULT_PROTOCOL_PORT
 
     return NodeConfig(
         address=local_address,
