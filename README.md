@@ -62,7 +62,8 @@ ai-ring-chat/
 │   ├── __init__.py     # View abstract base class
 │   └── views.py        # Tkinter implementation
 ├── control/
-│   └── network.py      # UDP send/receive handling
+│   ├── network.py      # UDP send/receive handling
+│   └── controller.py   # MVC controller (coordinates Model and View)
 ├── main.py             # Entry point
 └── README.md
 ```
@@ -73,7 +74,7 @@ ai-ring-chat/
 |-----------|---------------|
 | **Model** | Nodes data model, protocol handlers, message definitions |
 | **View** | GUI with abstract base class and Tkinter implementation |
-| **Control** | Network I/O (UDP send/receive) |
+| **Control** | Controller, network I/O (UDP send/receive) |
 
 ---
 
@@ -164,6 +165,28 @@ UDP handling is in `control/network.py`:
 | `receive(socket, timeout)` | Non-blocking receive with timeout, returns Message |
 
 **Error handling**: Since UDP doesn't guarantee delivery, failures are detected via PING/ECHO timeouts. If `is_head()` (no ECHO received) or `is_tail()` (no PING received), the recovery protocol is triggered.
+
+### Controller Layer
+
+The controller in `control/controller.py` coordinates Model and View:
+
+| Component | Description |
+|-----------|-------------|
+| **Controller** | Abstract base class for controller |
+| **TkinterController** | Implementation that integrates Node with TkinterView |
+
+**Startup Flow**: `main.py` parses args → creates Node → joins ring → shows View → starts controller loop
+
+**Controller Responsibilities**:
+- Create and manage Node instance
+- Handle message receiving loop (receive → protocol handler → response)
+- Handle periodic PING sending for heartbeat
+- Connect View callbacks to model actions
+- Update View with incoming messages and user list changes
+
+**Threading**: The controller uses separate threads for:
+- PING heartbeat (periodic sends)
+- Message receiving (blocking with timeout)
 
 ---
 
@@ -357,9 +380,9 @@ This project is being developed with AI assistance to evaluate:
 
 | Metric | Value |
 |--------|-------|
-| **Tests** | 146 passed |
-| **Coverage** | 98% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%, views.py: 91%) |
-| **Complexity** | Average A (1.96) |
+| **Tests** | 161 passed |
+| **Coverage** | 96% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%, controller.py: 71%, views.py: 91%) |
+| **Complexity** | Average A (2.12) |
 
 ### Code Complexity by Function
 

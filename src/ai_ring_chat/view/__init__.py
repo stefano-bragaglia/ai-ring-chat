@@ -72,3 +72,12 @@ class View(ABC):
             callback: Function to call when window is closed
         """
         pass
+
+    @abstractmethod
+    def set_input_text(self, text: str) -> None:
+        """Set the text in the message input field.
+
+        Args:
+            text: The text to set
+        """
+        pass
