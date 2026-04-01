@@ -44,11 +44,8 @@ class Address(NamedTuple):
                 f"Invalid address format: '{value}' (expected 'address:port')"
             )
 
-        parts = value.rsplit(":", 1)
-        if len(parts) != 2:
-            raise ValueError(f"Invalid address format: '{value}'")
+        addr, port_str = value.rsplit(":", 1)
 
-        addr, port_str = parts
         try:
             port = int(port_str)
         except ValueError:
@@ -56,12 +53,10 @@ class Address(NamedTuple):
                 f"Invalid port in address: '{value}' (port must be integer)"
             )
 
-        if port < 0 or port > 65535:
-            raise ValueError(
-                f"Invalid port in address: '{value}' (port must be 0-65535)"
-            )
+        if 0 <= port <= 65535:
+            return cls(address=addr, port=port)
 
-        return cls(address=addr, port=port)
+        raise ValueError(f"Invalid port in address: '{value}' (port must be 0-65535)")
 
 
 @dataclass
@@ -110,69 +105,90 @@ def parse_message(data: str) -> Message | None:
     except ValueError:
         return None
 
-    # Parse based on message type
+    # Parse based on message type using helper functions
+    parsers = {
+        MessageType.JOIN: _parse_join,
+        MessageType.EXIT: _parse_exit,
+        MessageType.PING: _parse_ping,
+        MessageType.ECHO: _parse_echo,
+        MessageType.NEXT: _parse_next,
+        MessageType.TEXT: _parse_text,
+        MessageType.USER: _parse_user,
+    }
+
     try:
-        match msg_type:
-            case MessageType.JOIN:
-                # JOIN <sender>
-                if len(parts) != 2:
-                    return None
-                sender = Address.parse(parts[1])
-                return Message(msg_type=msg_type, sender=sender, content="")
-
-            case MessageType.EXIT:
-                # EXIT <sender> <next>
-                if len(parts) != 3:
-                    return None
-                sender = Address.parse(parts[1])
-                next_addr = Address.parse(parts[2])
-                return Message(msg_type=msg_type, sender=sender, content=str(next_addr))
-
-            case MessageType.PING:
-                # PING <sender>
-                if len(parts) != 2:
-                    return None
-                sender = Address.parse(parts[1])
-                return Message(msg_type=msg_type, sender=sender, content="")
-
-            case MessageType.ECHO:
-                # ECHO <sender>
-                if len(parts) != 2:
-                    return None
-                sender = Address.parse(parts[1])
-                return Message(msg_type=msg_type, sender=sender, content="")
-
-            case MessageType.NEXT:
-                # NEXT <sender>
-                if len(parts) != 2:
-                    return None
-                sender = Address.parse(parts[1])
-                return Message(msg_type=msg_type, sender=sender, content="")
-
-            case MessageType.TEXT:
-                # TEXT <payload>
-                if len(parts) < 2:
-                    return None
-                payload = " ".join(parts[1:])
-                # Sender is needed - we'll set it later or use empty
-                return Message(
-                    msg_type=msg_type, sender=Address("0.0.0.0", 0), content=payload
-                )
-
-            case MessageType.USER:
-                # USER <target> <payload>
-                if len(parts) < 3:
-                    return None
-                target = Address.parse(parts[1])
-                payload = " ".join(parts[2:])
-                return Message(
-                    msg_type=msg_type,
-                    sender=Address("0.0.0.0", 0),
-                    content=f"{target} {payload}",
-                )
-
+        return parsers[msg_type](parts)
     except ValueError, IndexError:
         return None
+
+
+def _parse_join(parts: list[str]) -> Message | None:
+    """Parse JOIN message."""
+    if len(parts) != 2:
+        return None
+    return Message(
+        msg_type=MessageType.JOIN, sender=Address.parse(parts[1]), content=""
+    )
+
+
+def _parse_exit(parts: list[str]) -> Message | None:
+    """Parse EXIT message."""
+    if len(parts) != 3:
+        return None
+    sender = Address.parse(parts[1])
+    next_addr = Address.parse(parts[2])
+    return Message(msg_type=MessageType.EXIT, sender=sender, content=str(next_addr))
+
+
+def _parse_ping(parts: list[str]) -> Message | None:
+    """Parse PING message."""
+    if len(parts) != 2:
+        return None
+    return Message(
+        msg_type=MessageType.PING, sender=Address.parse(parts[1]), content=""
+    )
+
+
+def _parse_echo(parts: list[str]) -> Message | None:
+    """Parse ECHO message."""
+    if len(parts) != 2:
+        return None
+    return Message(
+        msg_type=MessageType.ECHO, sender=Address.parse(parts[1]), content=""
+    )
+
+
+def _parse_next(parts: list[str]) -> Message | None:
+    """Parse NEXT message."""
+    if len(parts) != 2:
+        return None
+    return Message(
+        msg_type=MessageType.NEXT, sender=Address.parse(parts[1]), content=""
+    )
+
+
+def _parse_text(parts: list[str]) -> Message | None:
+    """Parse TEXT message."""
+    if len(parts) < 2:
+        return None
+    return Message(
+        msg_type=MessageType.TEXT,
+        sender=Address("0.0.0.0", 0),
+        content=" ".join(parts[1:]),
+    )
+
+
+def _parse_user(parts: list[str]) -> Message | None:
+    """Parse USER message."""
+    if len(parts) < 3:
+        return None
+    target = Address.parse(parts[1])
+    payload = " ".join(parts[2:])
+    return Message(
+        msg_type=MessageType.USER,
+        sender=Address("0.0.0.0", 0),
+        content=f"{target} {payload}",
+    )
 
 
 def format_join(sender: Address) -> str:
