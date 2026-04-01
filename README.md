@@ -288,7 +288,7 @@ Since UDP has no built-in reliability, we need explicit failure detection.
 
 ## Usage
 
-### Command Line Arguments
+### Starting the Application
 
 ```bash
 # Start a new ring (first node) in normal mode
@@ -318,13 +318,16 @@ python -m ai_ring_chat --self 9000 --join 9001
 - **Default port**: 57782 (well-known port for the protocol)
 - **Test mode ports**: Must be > 1024 (privileged port threshold)
 
-Once running, type commands in the console:
+### GUI Interactions
 
-| Command | Description |
-|---------|-------------|
-| `send Hello everyone!` | Send public message |
-| `send @127.0.0.1:5001 Hello!` | Send private message |
-| `status` | Show current node and next node |
+Once the GUI window opens:
+
+| Action | Description |
+|--------|-------------|
+| **Type message** | Enter text in the message input field |
+| **Send** | Click "Send" button or press Enter |
+| **Private message** | Click a user in the list to prepend `@address:port` |
+| **Close window** | Gracefully exits the ring (sends EXIT message) |
 | `log` | Show recent messages |
 | `quit` | Gracefully exit the ring |
 | `help` | Show available commands |
@@ -380,9 +383,9 @@ This project is being developed with AI assistance to evaluate:
 
 | Metric | Value |
 |--------|-------|
-| **Tests** | 161 passed |
-| **Coverage** | 96% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%, controller.py: 71%, views.py: 91%) |
-| **Complexity** | Average A (2.12) |
+| **Tests** | 170+ passed |
+| **Coverage** | 95%+ overall |
+| **Complexity** | Average A (2.16) |
 
 ### Code Complexity by Function
 
@@ -402,7 +405,7 @@ This project is being developed with AI assistance to evaluate:
 | `get_ipv4_address` | A | 3 |
 | `parse_join_target` | A | 3 |
 | `parse_args` | A | 3 |
-| `main` | A | 3 |
+| `main` | B | 7 |
 | `Node` | A | 2 |
 | `Node.is_head` | A | 3 |
 | `Node.next_address_str` | A | 3 |

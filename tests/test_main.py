@@ -1,7 +1,7 @@
 """Tests for argument parsing in main.py."""
 
 import argparse
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -243,30 +243,62 @@ class TestGetIPv4Address:
 class TestMain:
     """Tests for main function."""
 
-    def test_main_normal_mode(self, capsys):
+    @patch("ai_ring_chat.main.TkinterView")
+    @patch("ai_ring_chat.main.TkinterController")
+    def test_main_normal_mode(self, mock_controller, mock_view, capsys):
         """Main should print configuration for normal mode."""
+        mock_view_instance = MagicMock()
+        mock_view.return_value = mock_view_instance
+        mock_controller_instance = MagicMock()
+        mock_controller.return_value = mock_controller_instance
+        mock_controller_instance.start.return_value = None
+
         with patch("sys.argv", ["ai-ring-chat"]):
-            result = main()
+            with patch("ai_ring_chat.main.network"):
+                result = main()
+
         assert result == 0
         captured = capsys.readouterr()
         assert "AI-Ring-Chat Node Configuration" in captured.out
         assert "NORMAL" in captured.out
         assert "57782" in captured.out
 
-    def test_main_test_mode(self, capsys):
+    @patch("ai_ring_chat.main.TkinterView")
+    @patch("ai_ring_chat.main.TkinterController")
+    def test_main_test_mode(self, mock_controller, mock_view, capsys):
         """Main should print configuration for test mode."""
+        mock_view_instance = MagicMock()
+        mock_view.return_value = mock_view_instance
+        mock_controller_instance = MagicMock()
+        mock_controller.return_value = mock_controller_instance
+        mock_controller_instance.start.return_value = None
+
         with patch("sys.argv", ["ai-ring-chat", "--self", "9000"]):
-            result = main()
+            with patch("ai_ring_chat.main.network"):
+                result = main()
+
         assert result == 0
         captured = capsys.readouterr()
         assert "TEST" in captured.out
         assert "9000" in captured.out
         assert "127.0.0.1" in captured.out
 
-    def test_main_with_join(self, capsys):
+    @patch("ai_ring_chat.main.TkinterView")
+    @patch("ai_ring_chat.main.TkinterController")
+    def test_main_with_join(self, mock_controller, mock_view, capsys):
         """Main should show join target when specified."""
+        mock_view_instance = MagicMock()
+        mock_view.return_value = mock_view_instance
+        mock_controller_instance = MagicMock()
+        mock_controller.return_value = mock_controller_instance
+        mock_controller_instance.start.return_value = None
+
         with patch("sys.argv", ["ai-ring-chat", "--join", "192.168.1.100"]):
-            result = main()
+            with patch("ai_ring_chat.main.network") as mock_network:
+                mock_network.parse_message.return_value = MagicMock()
+                mock_network.send.return_value = True
+                result = main()
+
         assert result == 0
         captured = capsys.readouterr()
         assert "Joining:" in captured.out

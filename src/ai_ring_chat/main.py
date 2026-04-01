@@ -6,6 +6,12 @@ import socket
 import sys
 from dataclasses import dataclass
 
+from ai_ring_chat.model.nodes import Node
+from ai_ring_chat.model.messages import Address, format_join
+from ai_ring_chat.view.views import TkinterView
+from ai_ring_chat.control.controller import TkinterController
+from ai_ring_chat.control import network
+
 # Convention: ports below 1024 require elevated privileges
 PRIVILEGED_PORT_THRESHOLD = 1024
 
@@ -35,6 +41,7 @@ def get_ipv4_address() -> str:
     Uses an outbound connection to determine the local address.
     Falls back to localhost if detection fails.
     """
+    s = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Does not need to be reachable
@@ -43,7 +50,7 @@ def get_ipv4_address() -> str:
     except Exception:
         ip = "127.0.0.1"
     finally:
-        if "s" in locals():
+        if s is not None:
             s.close()
     return ip
 
@@ -201,26 +208,68 @@ Examples:
     )
 
 
-def main() -> int:
+def main(args: list[str] | None = None) -> int:
     """Main entry point.
+
+    Args:
+        args: Optional list of arguments (defaults to sys.argv)
 
     Returns:
         Exit code (0 for success, non-zero for error)
     """
-    config = parse_args()
+    config = parse_args(args)
 
     print("AI-Ring-Chat Node Configuration")
     print(f"{'=' * 40}")
     print(f"Mode:       {'TEST' if config.is_test_mode else 'NORMAL'}")
     print(f"Address:    {config.address}")
     print(f"Port:       {config.port}")
-    if config.join_address:
-        print(f"Joining:    {config.join_address}:{config.join_port}")
-    else:
-        print("Joining:    (first node - creating new ring)")
 
-    # TODO: Initialize and run the ring chat node
+    # Create the node (Model)
+    node = Node(address=config.address, port=config.port)
+
+    # Handle joining an existing ring
+    _handle_join(node, config)
+
+    # Create the view and controller
+    view = TkinterView(config.address, config.port)
+    controller = TkinterController(node, view)
+
+    # Start the controller and view
+    controller.start()
+    view.show()
+
     return 0
+
+
+def _handle_join(node: Node, config) -> None:
+    """Handle joining an existing ring.
+
+    Args:
+        node: The node to configure
+        config: The parsed configuration
+    """
+    if not config.join_address or not config.join_port:
+        print("Joining:    (first node - creating new ring)")
+        return
+
+    print(f"Joining:    {config.join_address}:{config.join_port}")
+
+    # Send JOIN message to the target node
+    join_msg_str = format_join(Address(config.address, config.port))
+    join_msg = network.parse_message(join_msg_str)
+    if not join_msg:
+        return
+
+    success = network.send(config.join_address, config.join_port, join_msg)
+    if not success:
+        return
+
+    # Add the target to our address book
+    node.add_to_address_book(config.join_address, config.join_port)
+    # Set our next to the target (they will set their next to us)
+    node.set_next(config.join_address, config.join_port)
+    print(f"Sent JOIN to {config.join_address}:{config.join_port}")
 
 
 if __name__ == "__main__":

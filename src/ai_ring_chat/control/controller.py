@@ -1,30 +1,28 @@
-"""Controller abstract base class and implementations."""
+"""Controller base class and implementations."""
 
-from abc import ABC, abstractmethod
 import threading
 import time
 
 from ai_ring_chat.model.nodes import Node
 from ai_ring_chat.model.messages import Message, MessageType, Address, format_exit
-from ai_ring_chat.view import View
+from ai_ring_chat.view.views import View
 from ai_ring_chat.control import network
 
 
-class Controller(ABC):
-    """Abstract base class for the controller.
+class Controller:
+    """Base class for the controller.
 
     In MVC pattern, the controller coordinates between Model and View.
+    Subclasses must implement start and stop methods.
     """
 
-    @abstractmethod
     def start(self) -> None:
         """Start the controller (begin message handling)."""
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def stop(self) -> None:
         """Stop the controller."""
-        pass
+        raise NotImplementedError()
 
 
 class TkinterController(Controller):
@@ -90,40 +88,49 @@ class TkinterController(Controller):
 
         # Check for private message prefix
         if text.startswith("@"):
-            # Parse private message
-            parts = text.split(" ", 1)
-            if len(parts) >= 2:
-                target_str = parts[0][1:]  # Remove @
-                payload = parts[1]
-
-                try:
-                    target = network.parse_message(f"USER {target_str} payload")
-                    if target:
-                        # Send private message
-                        msg = Message(
-                            msg_type=MessageType.USER,
-                            sender=Address(self._node.address, self._node.port),
-                            content=f"{target_str} {payload}",
-                        )
-                        self._send_to_next(msg)
-
-                        # Show in our own view
-                        self._view.append_message(
-                            f"[Private to {target_str}] {payload}"
-                        )
-                except ValueError, IndexError:
-                    pass
+            self._send_private_message(text)
         else:
-            # Public message
-            msg = Message(
-                msg_type=MessageType.TEXT,
-                sender=Address(self._node.address, self._node.port),
-                content=text,
-            )
-            self._send_to_next(msg)
+            self._send_public_message(text)
 
-            # Show in our own view
-            self._view.append_message(f"[{self._node.self_address_str}] {text}")
+    def _send_private_message(self, text: str) -> None:
+        """Send a private message with @target:port prefix.
+
+        Args:
+            text: The message text starting with @
+        """
+        parts = text.split(" ", 1)
+        if len(parts) < 2:
+            return
+
+        target_str = parts[0][1:]  # Remove @
+        payload = parts[1]
+
+        try:
+            target = network.parse_message(f"USER {target_str} payload")
+            if target:
+                msg = Message(
+                    msg_type=MessageType.USER,
+                    sender=Address(self._node.address, self._node.port),
+                    content=f"{target_str} {payload}",
+                )
+                self._send_to_next(msg)
+                self._view.append_message(f"[Private to {target_str}] {payload}")
+        except ValueError, IndexError:
+            pass
+
+    def _send_public_message(self, text: str) -> None:
+        """Send a public message to the ring.
+
+        Args:
+            text: The message text
+        """
+        msg = Message(
+            msg_type=MessageType.TEXT,
+            sender=Address(self._node.address, self._node.port),
+            content=text,
+        )
+        self._send_to_next(msg)
+        self._view.append_message(f"[{self._node.self_address_str}] {text}")
 
     def on_user_click(self, user_address: str) -> None:
         """Handle user click in the view.
@@ -153,63 +160,114 @@ class TkinterController(Controller):
         Args:
             msg: The parsed message
         """
-        from ai_ring_chat.model.protocol import (
-            handle_join,
-            handle_exit,
-            handle_ping,
-            handle_echo,
-            handle_next,
-            handle_text,
-            handle_user,
-        )
+        # Delegate to specific handler based on message type
+        handlers = {
+            MessageType.JOIN: self._handle_join,
+            MessageType.EXIT: self._handle_exit,
+            MessageType.PING: self._handle_ping,
+            MessageType.ECHO: self._handle_echo,
+            MessageType.NEXT: self._handle_next,
+            MessageType.TEXT: self._handle_text,
+            MessageType.USER: self._handle_user,
+        }
 
-        # Create send function for protocol handlers
+        handler = handlers.get(msg.msg_type)
+        if handler:
+            handler(msg)
+
+    def _handle_join(self, msg: Message) -> None:
+        """Handle JOIN message."""
+        from ai_ring_chat.model.protocol import handle_join
+
         def send_func(addr: str, port: int, msg_str: str):
-            parsed = network.parse_message(msg_str)
-            if parsed:
-                network.send(addr, port, parsed)
+            self._send_via_network(addr, port, msg_str)
 
-        # Handle based on message type
-        match msg.msg_type:
-            case MessageType.JOIN:
-                handle_join(self._node, msg, send_func)
-                self._view.update_user_list(self._node.address_book)
-                self._view.append_message(f"Node {msg.sender} joined the ring")
+        handle_join(self._node, msg, send_func)
+        self._view.update_user_list(self._node.address_book)
+        self._view.append_message(f"Node {msg.sender} joined the ring")
 
-            case MessageType.EXIT:
-                handle_exit(self._node, msg, send_func)
-                self._view.update_user_list(self._node.address_book)
-                self._view.append_message(f"Node {msg.sender} left the ring")
+    def _handle_exit(self, msg: Message) -> None:
+        """Handle EXIT message."""
+        from ai_ring_chat.model.protocol import handle_exit
 
-            case MessageType.PING:
-                handle_ping(self._node, msg, send_func)
+        def send_func(addr: str, port: int, msg_str: str):
+            self._send_via_network(addr, port, msg_str)
 
-            case MessageType.ECHO:
-                handle_echo(self._node, msg, send_func)
+        handle_exit(self._node, msg, send_func)
+        self._view.update_user_list(self._node.address_book)
+        self._view.append_message(f"Node {msg.sender} left the ring")
 
-            case MessageType.NEXT:
-                handle_next(self._node, msg, send_func)
-                if self._node.is_head():
-                    self._view.append_message("Ring recovery completed")
+    def _handle_ping(self, msg: Message) -> None:
+        """Handle PING message."""
+        from ai_ring_chat.model.protocol import handle_ping
 
-            case MessageType.TEXT:
-                # Add sender to address book
-                self._node.add_to_address_book(msg.sender.address, msg.sender.port)
-                handle_text(self._node, msg, send_func)
-                self._view.append_message(f"[{msg.sender}] {msg.content}")
-                self._view.update_user_list(self._node.address_book)
+        def send_func(addr: str, port: int, msg_str: str):
+            self._send_via_network(addr, port, msg_str)
 
-            case MessageType.USER:
-                # Add sender to address book
-                self._node.add_to_address_book(msg.sender.address, msg.sender.port)
-                handle_user(self._node, msg, send_func)
-                # If not delivered, it was for someone else
-                if (
-                    msg.content.split(" ", 1)[0]
-                    == f"{self._node.address}:{self._node.port}"
-                ):
-                    payload = msg.content.split(" ", 1)[1] if " " in msg.content else ""
-                    self._view.append_message(f"[Private from {msg.sender}] {payload}")
+        handle_ping(self._node, msg, send_func)
+
+    def _handle_echo(self, msg: Message) -> None:
+        """Handle ECHO message."""
+        from ai_ring_chat.model.protocol import handle_echo
+
+        def send_func(addr: str, port: int, msg_str: str):
+            self._send_via_network(addr, port, msg_str)
+
+        handle_echo(self._node, msg, send_func)
+
+    def _handle_next(self, msg: Message) -> None:
+        """Handle NEXT (recovery) message."""
+        from ai_ring_chat.model.protocol import handle_next
+
+        def send_func(addr: str, port: int, msg_str: str):
+            self._send_via_network(addr, port, msg_str)
+
+        handle_next(self._node, msg, send_func)
+        if self._node.is_head():
+            self._view.append_message("Ring recovery completed")
+
+    def _handle_text(self, msg: Message) -> None:
+        """Handle TEXT (public message) message."""
+        from ai_ring_chat.model.protocol import handle_text
+
+        def send_func(addr: str, port: int, msg_str: str):
+            self._send_via_network(addr, port, msg_str)
+
+        self._node.add_to_address_book(msg.sender.address, msg.sender.port)
+        handle_text(self._node, msg, send_func)
+        self._view.append_message(f"[{msg.sender}] {msg.content}")
+        self._view.update_user_list(self._node.address_book)
+
+    def _handle_user(self, msg: Message) -> None:
+        """Handle USER (private message) message."""
+        from ai_ring_chat.model.protocol import handle_user
+
+        def send_func(addr: str, port: int, msg_str: str):
+            self._send_via_network(addr, port, msg_str)
+
+        self._node.add_to_address_book(msg.sender.address, msg.sender.port)
+        handle_user(self._node, msg, send_func)
+
+        # Check if message was for us
+        if self._is_private_message_for_us(msg):
+            payload = self._extract_private_payload(msg)
+            self._view.append_message(f"[Private from {msg.sender}] {payload}")
+
+    def _is_private_message_for_us(self, msg: Message) -> bool:
+        """Check if private message is targeted to this node."""
+        target = msg.content.split(" ", 1)[0] if msg.content else ""
+        return target == f"{self._node.address}:{self._node.port}"
+
+    def _extract_private_payload(self, msg: Message) -> str:
+        """Extract payload from private message."""
+        parts = msg.content.split(" ", 1)
+        return parts[1] if len(parts) > 1 else ""
+
+    def _send_via_network(self, addr: str, port: int, msg_str: str) -> None:
+        """Send a message via network."""
+        parsed = network.parse_message(msg_str)
+        if parsed:
+            network.send(addr, port, parsed)
 
     def update_user_list(self) -> None:
         """Update the view with current user list."""

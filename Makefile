@@ -21,9 +21,10 @@ help:
 	@echo "  make clean      - Remove coverage and cache files"
 	@echo "  make ci         - Full CI pipeline (all checks in order)"
 
-# Run tests
+# Run tests - run fast tests first, then controller tests separately
 test:
-	$(PYTEST) tests/
+	$(PYTEST) tests/test_main.py tests/test_main_integration.py tests/test_messages.py tests/test_nodes.py tests/test_protocol.py tests/test_network.py tests/test_view.py -q
+	$(PYTEST) tests/test_controller.py -q
 
 # Check cyclomatic complexity
 complexity:
@@ -45,9 +46,11 @@ lint:
 type:
 	$(MYPY) src/
 
-# Coverage report
+# Coverage report - run fast tests first, then controller tests separately
 coverage:
-	$(COVERAGE) run -m pytest tests/ && $(COVERAGE) report
+	$(COVERAGE) run -m pytest tests/test_main.py tests/test_main_integration.py tests/test_messages.py tests/test_nodes.py tests/test_protocol.py tests/test_network.py tests/test_view.py -q
+	$(COVERAGE) run --append -m pytest tests/test_controller.py -q
+	$(COVERAGE) report
 
 # Clean cache files
 clean:

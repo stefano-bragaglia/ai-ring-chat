@@ -4,10 +4,80 @@ import tkinter as tk
 from tkinter import ttk
 import re
 
-from ai_ring_chat.view import View
-
 # Maximum number of messages to keep in chat log
 MAX_CHAT_LOG = 100
+
+
+class View:
+    """Base class for the chat view.
+
+    Defines the interface that all view implementations must follow.
+    Subclasses must implement all methods.
+    """
+
+    def show(self) -> None:
+        """Display the view (start the GUI main loop)."""
+        raise NotImplementedError()
+
+    def update_user_list(self, users: list[str]) -> None:
+        """Update the list of users shown in the view.
+
+        Args:
+            users: List of user addresses in format 'address:port'
+        """
+        raise NotImplementedError()
+
+    def append_message(self, message: str) -> None:
+        """Append a message to the chat log.
+
+        Args:
+            message: The message to append
+        """
+        raise NotImplementedError()
+
+    def get_message(self) -> str:
+        """Get the current message from the input field.
+
+        Returns:
+            The message text
+        """
+        raise NotImplementedError()
+
+    def clear_message(self) -> None:
+        """Clear the message input field."""
+        raise NotImplementedError()
+
+    def set_send_callback(self, callback) -> None:
+        """Set the callback for the send action.
+
+        Args:
+            callback: Function to call when send is triggered
+        """
+        raise NotImplementedError()
+
+    def set_user_click_callback(self, callback) -> None:
+        """Set the callback for user list clicks.
+
+        Args:
+            callback: Function to call when a user is clicked (receives address:port)
+        """
+        raise NotImplementedError()
+
+    def set_close_callback(self, callback) -> None:
+        """Set the callback for window close.
+
+        Args:
+            callback: Function to call when window is closed
+        """
+        raise NotImplementedError()
+
+    def set_input_text(self, text: str) -> None:
+        """Set the text in the message input field.
+
+        Args:
+            text: The text to set
+        """
+        raise NotImplementedError()
 
 
 class TkinterView(View):
