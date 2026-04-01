@@ -57,12 +57,11 @@ ai-ring-chat/
 ├── model/
 │   ├── nodes.py         # Node data model (address, next, address_book, message_log)
 │   ├── protocol.py     # Protocol handlers (handle_join, handle_exit, etc.)
-│   └── message.py      # Message types and parsing
+│   └── messages.py     # Message types and parsing
 ├── view/
 │   └── console.py       # Console-based user interface
 ├── control/
-│   ├── network.py       # UDP send/receive handling
-│   └── console.py       # Console-based UI (moved from view/)
+│   └── network.py       # UDP send/receive handling
 ├── main.py              # Entry point
 └── README.md
 ```
@@ -311,7 +310,7 @@ This project is being developed with AI assistance to evaluate:
 | Metric | Value |
 |--------|-------|
 | **Tests** | 118 passed |
-| **Coverage** | 99% overall (main.py: 99%, message.py: 99%, nodes.py: 96%, protocol.py: 100%) |
+| **Coverage** | 99% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%) |
 | **Complexity** | Average A (2.21) |
 
 ### Code Complexity by Function

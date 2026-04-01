@@ -1,7 +1,7 @@
 """Protocol handlers for the ring chat network."""
 
 from ai_ring_chat.model.nodes import Node
-from ai_ring_chat.model.message import Message, MessageType, Address
+from ai_ring_chat.model.messages import Message, MessageType, Address
 
 # Timeout thresholds (in seconds) for head/tail detection
 PING_TIMEOUT = 5.0  # If no PING received for this time, node is tail

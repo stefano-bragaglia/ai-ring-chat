@@ -2,7 +2,7 @@
 
 import pytest
 
-from ai_ring_chat.model.message import (
+from ai_ring_chat.model.messages import (
     Address,
     Message,
     MessageType,
