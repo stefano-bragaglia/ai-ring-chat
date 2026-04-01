@@ -56,8 +56,7 @@ The application follows the **Model/View/Control (MVC)** paradigm:
 ai-ring-chat/
 ├── model/
 │   ├── nodes.py         # Node data model (address, next, address_book, message_log)
-│   ├── message.py       # Message types and parsing
-│   └── ring_state.py    # Ring topology (replaced by nodes.py)
+│   └── message.py      # Message types and parsing
 ├── view/
 │   └── console.py       # Console-based user interface
 ├── control/
