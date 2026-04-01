@@ -113,9 +113,15 @@ Node determines its state:
 
 ### Network Layer
 
-Low-level UDP sending is handled by `control/network.py`:
-- `send(address, port, message)` - send message to endpoint
-- `receive(socket)` - receive incoming messages
+UDP handling is in `control/network.py`:
+
+| Function | Description |
+|----------|-------------|
+| `create_socket(port)` | Create UDP socket bound to port |
+| `send(address, port, message)` | Send Message to endpoint |
+| `receive(socket, timeout)` | Non-blocking receive with timeout, returns Message |
+
+**Error handling**: Since UDP doesn't guarantee delivery, failures are detected via PING/ECHO timeouts. If `is_head()` (no ECHO received) or `is_tail()` (no PING received), the recovery protocol is triggered.
 
 ---
 
@@ -310,7 +316,7 @@ This project is being developed with AI assistance to evaluate:
 | Metric | Value |
 |--------|-------|
 | **Tests** | 118 passed |
-| **Coverage** | 99% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%) |
+| **Coverage** | 99% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%) |
 | **Complexity** | Average A (2.21) |
 
 ### Code Complexity by Function
