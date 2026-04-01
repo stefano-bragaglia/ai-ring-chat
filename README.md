@@ -270,21 +270,29 @@ This project is being developed with AI assistance to evaluate:
 
 | Metric | Value |
 |--------|-------|
-| **Tests** | 30 passed |
-| **Coverage** | 99% overall (main.py: 99%) |
-| **Complexity** | Average A (2.71) |
+| **Tests** | 97 passed |
+| **Coverage** | 99% overall (main.py: 99%, message.py: 98%, nodes.py: 100%) |
+| **Complexity** | Average A (2.68) |
 
 ### Code Complexity by Function
 
 | Function | Grade | Score |
 |----------|-------|-------|
+| `parse_message` | C | 19 |
+| `Address.parse` | B | 6 |
 | `parse_port` | A | 4 |
+| `Node.add_to_address_book` | A | 4 |
 | `get_ipv4_address` | A | 3 |
 | `parse_join_target` | A | 3 |
 | `parse_args` | A | 3 |
 | `main` | A | 3 |
+| `Node.next_address_str` | A | 3 |
+| `Address` | A | 5 |
+| `Node` | A | 3 |
+| `Message` | A | 3 |
 | `is_valid_ipv4` | A | 2 |
 | `NodeConfig` | A | 1 |
+| `MessageType` | A | 1 |
 
 ---
 
