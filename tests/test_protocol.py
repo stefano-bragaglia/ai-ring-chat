@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from ai_ring_chat.model.nodes import Node
 from ai_ring_chat.model.message import Message, MessageType, Address
-from ai_ring_chat.control.protocol import (
+from ai_ring_chat.model.protocol import (
     handle_join,
     handle_exit,
     handle_ping,

@@ -56,12 +56,13 @@ The application follows the **Model/View/Control (MVC)** paradigm:
 ai-ring-chat/
 ├── model/
 │   ├── nodes.py         # Node data model (address, next, address_book, message_log)
+│   ├── protocol.py     # Protocol handlers (handle_join, handle_exit, etc.)
 │   └── message.py      # Message types and parsing
 ├── view/
 │   └── console.py       # Console-based user interface
 ├── control/
 │   ├── network.py       # UDP send/receive handling
-│   └── protocol.py      # Connection, exit, heartbeat protocols
+│   └── console.py       # Console-based UI (moved from view/)
 ├── main.py              # Entry point
 └── README.md
 ```
@@ -70,15 +71,15 @@ ai-ring-chat/
 
 | Component | Responsibility |
 |-----------|---------------|
-| **Model** | Nodes data model, ring topology state, message definitions |
+| **Model** | Nodes data model, protocol handlers, message definitions |
 | **View** | User interface (console output, display formatting) |
-| **Control** | Network I/O, protocol handlers, user command processing |
+| **Control** | Network I/O (UDP send/receive) |
 
 ---
 
 ## Network Protocol
 
-The protocol is implemented in `control/protocol.py` with static methods that handle each message type. The `Node` class in `model/nodes.py` leads the interaction - it listens for messages and delegates handling to protocol methods.
+The protocol is implemented in `model/protocol.py` with static methods that handle each message type. The `Node` class in `model/nodes.py` leads the interaction - it listens for messages and delegates handling to protocol methods.
 
 ### Protocol Methods
 
