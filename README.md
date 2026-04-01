@@ -259,4 +259,26 @@ This project is being developed with AI assistance to evaluate:
 
 ---
 
+## Quality Metrics
+
+| Metric | Value |
+|--------|-------|
+| **Tests** | 30 passed |
+| **Coverage** | 99% overall (main.py: 99%) |
+| **Complexity** | Average A (2.71) |
+
+### Code Complexity by Function
+
+| Function | Grade | Score |
+|----------|-------|-------|
+| `parse_port` | A | 4 |
+| `get_ipv4_address` | A | 3 |
+| `parse_join_target` | A | 3 |
+| `parse_args` | A | 3 |
+| `main` | A | 3 |
+| `is_valid_ipv4` | A | 2 |
+| `NodeConfig` | A | 1 |
+
+---
+
 *In omnia solacium*

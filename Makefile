@@ -56,5 +56,5 @@ clean:
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
 # Full CI pipeline (in order)
-ci: test complexity fix format lint type coverage
+ci: test complexity coverage fix format lint type
 	@echo "All checks passed!"
