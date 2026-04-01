@@ -213,7 +213,7 @@ def main() -> int:
     """
     config = parse_args()
 
-    print(f"AI-Ring-Chat Node Configuration")
+    print("AI-Ring-Chat Node Configuration")
     print(f"{'=' * 40}")
     print(f"Mode:       {'TEST' if config.is_test_mode else 'NORMAL'}")
     print(f"Address:    {config.address}")
@@ -221,7 +221,7 @@ def main() -> int:
     if config.join_address:
         print(f"Joining:    {config.join_address}:{config.join_port}")
     else:
-        print(f"Joining:    (first node - creating new ring)")
+        print("Joining:    (first node - creating new ring)")
 
     # TODO: Initialize and run the ring chat node
     return 0

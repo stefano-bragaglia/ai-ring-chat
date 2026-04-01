@@ -5,7 +5,6 @@ import argparse
 import pytest
 
 from ai_ring_chat.main import (
-    PRIVILEGED_PORT_THRESHOLD,
     DEFAULT_PROTOCOL_PORT,
     parse_port,
     is_valid_ipv4,

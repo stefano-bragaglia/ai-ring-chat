@@ -7,7 +7,7 @@ name = "ai-ring-chat"
 version = "0.0.1"
 description = "A distributed, decentralized UDP chat application using a ring topology"
 readme = "README.md"
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.14"
 dependencies = []
 
