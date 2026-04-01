@@ -1,6 +1,7 @@
 """Tests for argument parsing in main.py."""
 
 import argparse
+from unittest.mock import patch
 
 import pytest
 
@@ -10,6 +11,8 @@ from ai_ring_chat.main import (
     is_valid_ipv4,
     parse_join_target,
     parse_args,
+    get_ipv4_address,
+    main,
     NodeConfig,
 )
 
@@ -44,38 +47,34 @@ class TestParsePort:
 
     def test_valid_port(self):
         """Valid ports should return the port number."""
-        assert parse_port("57782", "--join", is_test_mode=False) == 57782
-        assert parse_port("0", "--join", is_test_mode=False) == 0
-        assert parse_port("65535", "--join", is_test_mode=False) == 65535
-
-    def test_test_mode_valid_port(self):
-        """Test mode ports > 1024 should work."""
-        assert parse_port("1025", "--self", is_test_mode=True) == 1025
-        assert parse_port("9000", "--join", is_test_mode=True) == 9000
+        assert parse_port("1025", "--self") == 1025
+        assert parse_port("9000", "--join") == 9000
+        assert parse_port("57782", "--self") == 57782
+        assert parse_port("65535", "--join") == 65535
 
     def test_non_numeric(self):
         """Non-numeric port should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_port("abc", "--join", is_test_mode=False)
+            parse_port("abc", "--join")
         assert "not a number" in str(exc_info.value)
 
-    def test_port_too_low(self):
+    def test_port_too_low_negative(self):
         """Port < 0 should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_port("-1", "--join", is_test_mode=False)
-        assert "between 0 and 65535" in str(exc_info.value)
+            parse_port("-1", "--join")
+        assert "root privileges" in str(exc_info.value)
 
     def test_port_too_high(self):
         """Port > 65535 should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_port("65536", "--join", is_test_mode=False)
-        assert "between 0 and 65535" in str(exc_info.value)
+            parse_port("65536", "--join")
+        assert "root privileges" in str(exc_info.value)
 
-    def test_test_mode_port_too_low(self):
-        """Test mode port <= 1024 should raise."""
+    def test_privileged_port(self):
+        """Port <= 1024 should raise."""
         with pytest.raises(argparse.ArgumentTypeError) as exc_info:
-            parse_port("1024", "--self", is_test_mode=True)
-        assert "greater than 1024" in str(exc_info.value)
+            parse_port("1024", "--self")
+        assert "root privileges" in str(exc_info.value)
 
 
 class TestParseJoinTarget:
@@ -218,3 +217,57 @@ class TestNodeConfig:
         )
         assert config.join_address is None
         assert config.join_port is None
+
+
+class TestGetIPv4Address:
+    """Tests for get_ipv4_address function."""
+
+    def test_returns_detected_ip(self):
+        """Should return IP from socket connection."""
+        with patch("socket.socket") as mock_socket:
+            mock_instance = mock_socket.return_value
+            mock_instance.getsockname.return_value = ("192.168.1.100",)
+            result = get_ipv4_address()
+            assert result == "192.168.1.100"
+            mock_instance.connect.assert_called_once()
+            mock_instance.close.assert_called_once()
+
+    def test_fallback_on_exception(self):
+        """Should return 127.0.0.1 when socket fails."""
+        with patch("socket.socket") as mock_socket:
+            mock_socket.side_effect = OSError("Network unavailable")
+            result = get_ipv4_address()
+            assert result == "127.0.0.1"
+
+
+class TestMain:
+    """Tests for main function."""
+
+    def test_main_normal_mode(self, capsys):
+        """Main should print configuration for normal mode."""
+        with patch("sys.argv", ["ai-ring-chat"]):
+            result = main()
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "AI-Ring-Chat Node Configuration" in captured.out
+        assert "NORMAL" in captured.out
+        assert "57782" in captured.out
+
+    def test_main_test_mode(self, capsys):
+        """Main should print configuration for test mode."""
+        with patch("sys.argv", ["ai-ring-chat", "--self", "9000"]):
+            result = main()
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "TEST" in captured.out
+        assert "9000" in captured.out
+        assert "127.0.0.1" in captured.out
+
+    def test_main_with_join(self, capsys):
+        """Main should show join target when specified."""
+        with patch("sys.argv", ["ai-ring-chat", "--join", "192.168.1.100"]):
+            result = main()
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Joining:" in captured.out
+        assert "192.168.1.100" in captured.out
