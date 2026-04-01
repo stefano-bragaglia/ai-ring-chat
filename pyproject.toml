@@ -5,5 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "ai-ring-chat"
 version = "0.0.1"
-description = ""
+description = "A distributed, decentralized UDP chat application using a ring topology"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.14"
 dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_ring_chat"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/ai_ring_chat"]
