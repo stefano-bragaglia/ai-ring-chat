@@ -13,11 +13,11 @@ help:
 	@echo "Available targets:"
 	@echo "  make test       - Run tests"
 	@echo "  make complexity - Check cyclomatic complexity"
+	@echo "  make coverage   - Run tests with coverage"
 	@echo "  make fix        - Auto-fix lint issues"
 	@echo "  make format     - Format code with black"
 	@echo "  make lint       - Run ruff linting"
 	@echo "  make type       - Run mypy type checking"
-	@echo "  make coverage   - Run tests with coverage"
 	@echo "  make clean      - Remove coverage and cache files"
 	@echo "  make ci         - Full CI pipeline (all checks in order)"
 

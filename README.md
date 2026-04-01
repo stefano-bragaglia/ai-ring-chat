@@ -55,16 +55,15 @@ The application follows the **Model/View/Control (MVC)** paradigm:
 ```
 ai-ring-chat/
 ├── model/
-│   ├── node.py          # Core node state and logic
+│   ├── nodes.py         # Node data model (address, next, address_book, message_log)
 │   ├── message.py       # Message types and parsing
-│   └── ring_state.py    # Ring topology state management
+│   └── ring_state.py    # Ring topology (replaced by nodes.py)
 ├── view/
 │   └── console.py       # Console-based user interface
 ├── control/
 │   ├── network.py       # UDP send/receive handling
 │   └── protocol.py      # Connection, exit, heartbeat protocols
 ├── main.py              # Entry point
-├── config.py            # Configuration constants
 └── README.md
 ```
 
@@ -72,7 +71,7 @@ ai-ring-chat/
 
 | Component | Responsibility |
 |-----------|---------------|
-| **Model** | Core data structures, node state, ring topology, message definitions |
+| **Model** | Nodes data model, ring topology state, message definitions |
 | **View** | User interface (console output, display formatting) |
 | **Control** | Network I/O, protocol handlers, user command processing |
 
@@ -96,19 +95,20 @@ Each node maintains:
 
 | Type | Format | Description |
 |------|--------|-------------|
-| **Join** | `node self_address:port` | New node joining the ring |
-| **Exit** | `exit self_address:port next_address:port` | Node gracefully leaving |
-| **Echo** | `echo self_address:port` | Liveness/heartbeat check |
-| **Echo Response** | `echo_resp target_address:port origin_address:port` | Response to echo |
-| **First** | `first requester_address:port` | Recovery when predecessor fails |
-| **Public Text** | `text message_content` | Broadcast message to all nodes |
-| **Private Text** | `user target_address:port message_content` | Direct message to specific node |
-| **Restore** | `restore broken_address:port new_next_address:port` | Ring repair (double ring) |
+| **JOIN** | `JOIN address:port` | New node joining the ring |
+| **EXIT** | `EXIT address:port next_address:port` | Node gracefully leaving |
+| **PING** | `PING address:port` | Liveness/heartbeat check |
+| **ECHO** | `ECHO address:port` | Response to PING |
+| **NEXT** | `NEXT address:port` | Recovery when predecessor fails (tail → head) |
+| **TEXT** | `TEXT message_content` | Broadcast message to all nodes |
+| **USER** | `USER target_address:port message_content` | Direct message to specific node |
+
+**Note:** Every message contains the sender's address. Nodes build a local address book as messages propagate through the ring, enabling private messaging to any known node.
 
 ### Connection Protocol (Node Join)
 
 1. New node `N` knows existing node `X`'s `address:port`
-2. `N` sends `node N_address:port` to `X`
+2. `N` sends `JOIN N_address:port` to `X`
 3. `X` receives the message, records `N` as its `next`
 4. `X` replies (or the message propagates) so `N` knows `X`'s address
 5. `N` sets its `next` to whatever was `X`'s previous `next`
@@ -122,7 +122,7 @@ After:  [X] ──► [N] ──► [Y]
 
 ### Exit Protocol (Graceful Leave)
 
-1. Exiting node `E` sends `exit E_address:port next_address:port`
+1. Exiting node `E` sends `EXIT E_address:port next_address:port`
 2. Message propagates around the ring
 3. When message reaches node `P` where `P.next == E`:
    - `P` replaces `P.next` with `E.next`
@@ -132,19 +132,27 @@ After:  [X] ──► [N] ──► [Y]
 
 Since UDP has no built-in reliability, we need explicit failure detection.
 
-#### Single Ring Recovery (Echo Protocol)
+#### Single Ring Recovery (PING/ECHO Protocol)
 
-1. **Heartbeat**: Each node periodically sends `echo self_address:port` to its `next`
-2. If the `echo_resp` doesn't arrive within a timeout, `next` is considered failed
-3. **Recovery**: Node sends `first self_address:port` forward
-4. When this reaches the node that knew the failed `next`, it updates its `next` to the sender of `first`
+1. **Heartbeat**: Each node periodically sends `PING address:port` to its `next`
+2. If the `ECHO` doesn't arrive within a timeout, `next` is considered failed
+3. **Recovery (Tail → Head)**:
+   - Node that stops receiving PINGs knows it became the **tail**
+   - Tail sends `NEXT address:port` forward (propagates around ring)
+   - Node that was sending PINGs but not receiving ECHOs knows it became the **head** (its PINGs to next are failing)
+   - Head updates its `next` to the address in the NEXT message
+   - Ring is restored
 
-#### Double Ring Recovery (Restore Protocol)
-
-With two rings (clockwise and counter-clockwise):
-1. Detect failure via missing heartbeat
-2. Send `restore broken_address:port new_next_address:port` backwards
-3. Each node updates its backward pointer
+```
+    [Head] ──► [Failing Node] ──► [Tail]
+        │                           │
+        │  (PINGs not ECHOed)      │  (no PINGs received)
+        ▼                           ▼
+    Becomes head               Sends NEXT
+                                    │
+                                    ▼
+                            NEXT propagates → Head updates next
+```
 
 ### Message Propagation Rules
 
@@ -153,17 +161,17 @@ With two rings (clockwise and counter-clockwise):
 - **Stops** when it returns to the original sender (no loops)
 - Each node logs it and caches by message ID
 
-#### Private Messages (`user target_address:port`)
+#### Private Messages (`USER target_address:port`)
 - Propagates to `next`
 - **Stops** when it reaches the `target`
 - Target logs it; intermediate nodes ignore content
 - Does not propagate further after delivery
 
 #### Cache & Deduplication
-- Each message has a unique ID (sender + sequence number)
-- Nodes cache recent message IDs
-- If a message ID is already seen, it is **not** propagated again
+- Each node maintains a `message_log` of recent payloads
+- When a message is received, if its payload is already in the log, it is **not** propagated again
 - This handles both sender failure and message loops
+- Log entries are stored with timestamps for potential cleanup
 
 ---
 
