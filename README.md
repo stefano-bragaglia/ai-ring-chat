@@ -315,9 +315,9 @@ This project is being developed with AI assistance to evaluate:
 
 | Metric | Value |
 |--------|-------|
-| **Tests** | 118 passed |
+| **Tests** | 128 passed |
 | **Coverage** | 99% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%) |
-| **Complexity** | Average A (2.21) |
+| **Complexity** | Average A (2.20) |
 
 ### Code Complexity by Function
 
@@ -325,6 +325,7 @@ This project is being developed with AI assistance to evaluate:
 |----------|-------|-------|
 | `parse_message` | A | 5 |
 | `handle_user` | A | 5 |
+| `receive` | A | 3 |
 | `parse_port` | A | 4 |
 | `Node.add_to_address_book` | A | 4 |
 | `_process_exit` | A | 4 |
@@ -332,6 +333,7 @@ This project is being developed with AI assistance to evaluate:
 | `Address.parse` | A | 4 |
 | `handle_next` | A | 4 |
 | `handle_text` | A | 4 |
+| `send` | A | 2 |
 | `get_ipv4_address` | A | 3 |
 | `parse_join_target` | A | 3 |
 | `parse_args` | A | 3 |
