@@ -169,18 +169,38 @@ With two rings (clockwise and counter-clockwise):
 
 ## Usage
 
-### Starting a Node
+### Command Line Arguments
 
 ```bash
-python main.py --address 127.0.0.1 --port 5000 --join 127.0.0.1:5001
+# Start a new ring (first node) in test mode
+python -m ai_ring_chat --local 9000
+
+# Join an existing ring (normal mode)
+python -m ai_ring_chat --join 192.168.1.100:57782
+
+# Join an existing ring using default port (57782)
+python -m ai_ring_chat --join 192.168.1.100
+
+# Join a local test ring (test mode with two nodes)
+# Terminal 1: Start first test node
+python -m ai_ring_chat --local 9000
+# Terminal 2: Join first test node
+python -m ai_ring_chat --local 9001 --join 9000
 ```
 
-Parameters:
-- `--address` — Local bind address (default: 127.0.0.1)
-- `--port` — Local port (required)
-- `--join` — Existing node to join (optional; omit for first node)
+### Arguments
 
-### Commands (Interactive)
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--local PORT` | `-l` | Test mode: run locally on specified port (> 1024). Address defaults to 127.0.0.1 |
+| `--join TARGET` | `-j` | Address:port of node to join. In test mode, TARGET can be just a port (uses localhost) |
+
+### Notes
+
+- **Default port**: 57782 (well-known port for the protocol)
+- **Local address**: Auto-detected via outbound connection (in normal mode)
+- **Test mode ports**: Must be > 1024 (privileged port threshold)
+- Running without arguments starts a new ring in normal mode
 
 Once running, type commands in the console:
 
