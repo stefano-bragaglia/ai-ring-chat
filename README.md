@@ -59,10 +59,11 @@ ai-ring-chat/
 │   ├── protocol.py     # Protocol handlers (handle_join, handle_exit, etc.)
 │   └── messages.py     # Message types and parsing
 ├── view/
-│   └── console.py       # Console-based user interface
+│   ├── __init__.py     # View abstract base class
+│   └── views.py        # Tkinter implementation
 ├── control/
-│   └── network.py       # UDP send/receive handling
-├── main.py              # Entry point
+│   └── network.py      # UDP send/receive handling
+├── main.py             # Entry point
 └── README.md
 ```
 
@@ -71,8 +72,49 @@ ai-ring-chat/
 | Component | Responsibility |
 |-----------|---------------|
 | **Model** | Nodes data model, protocol handlers, message definitions |
-| **View** | User interface (console output, display formatting) |
+| **View** | GUI with abstract base class and Tkinter implementation |
 | **Control** | Network I/O (UDP send/receive) |
+
+---
+
+## User Interface
+
+The view is implemented using Tkinter with a split layout:
+
+```
++--------------------------------------------------+
+|  [Window Title: address:port]                   |
++--------------------------------------------------+
+|  User List (left)  |  Chat Log (right)          |
+|  - 127.0.0.1:5001  |  [Last 100 messages]       |
+|  - 127.0.0.1:5002  |                            |
+|  - 127.0.0.1:5003  |                            |
++--------------------------------------------------+
+|  [Message Input]                    [Send Button]|
++--------------------------------------------------+
+```
+
+### UI Components
+
+| Component | Description |
+|-----------|-------------|
+| **Window Title** | Displays the node's own address:port |
+| **User List (left)** | Shows all known addresses in the ring (clickable) |
+| **Chat Log (right)** | Displays last 100 messages (public & private) |
+| **Message Input** | Text field for typing messages |
+| **Send Button** | Sends message when clicked or Enter pressed |
+
+### User Interactions
+
+- **Click user in list**: Prepends `@address:port` to message (for private messaging)
+- **Send message**: Click button or press Enter to send
+- **Close window**: Client gracefully exits the ring (sends EXIT message)
+
+### Private Messaging
+
+- Messages starting with `@address:port` are private
+- Clicking a user replaces any existing `@address:port` prefix
+- Messages without prefix are broadcast to all nodes
 
 ---
 
@@ -315,9 +357,9 @@ This project is being developed with AI assistance to evaluate:
 
 | Metric | Value |
 |--------|-------|
-| **Tests** | 128 passed |
-| **Coverage** | 99% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%) |
-| **Complexity** | Average A (2.20) |
+| **Tests** | 146 passed |
+| **Coverage** | 98% overall (main.py: 99%, messages.py: 99%, nodes.py: 96%, protocol.py: 100%, network.py: 100%, views.py: 91%) |
+| **Complexity** | Average A (1.96) |
 
 ### Code Complexity by Function
 
